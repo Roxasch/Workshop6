@@ -53,6 +53,7 @@ var initialData = {
       // List of comments on the post
       "comments": [
         {
+          "_id": 1,
           // The author of the comment.
           "author": 2,
           // The contents of the comment.

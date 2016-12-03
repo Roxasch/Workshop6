@@ -123,17 +123,16 @@ export function postStatusUpdate(user, location, contents, cb) {
  * Adds a new comment to the database on the given feed item.
  */
 export function postComment(feedItemId, author, contents, cb) {
-  var feedItem = readDocument('feedItems', feedItemId);
-  feedItem.comments.push({
-    "author": author,
-    "contents": contents,
-    "postDate": new Date().getTime(),
-    "likeCounter": []
-  });
-  writeDocument('feedItems', feedItem);
-  // Return a resolved version of the feed item.
-  emulateServerReturn(getFeedItemSync(feedItemId), cb);
+  sendXHR('POST', '/comment', {
+          userId: author,
+          feedItemId: feedItemId,
+          contents: contents
+        }, (xhr) => {
+          console.log(xhr.responseText);
+          cb(JSON.parse(xhr.responseText));
+        });
 }
+
 
 /**
 * Updates a feed item's likeCounter by adding the user to the likeCounter.
@@ -142,6 +141,7 @@ export function postComment(feedItemId, author, contents, cb) {
 export function likeFeedItem(feedItemId, userId, cb) {
   sendXHR('PUT', '/feeditem/' + feedItemId + '/likelist/' + userId,
     undefined, (xhr) => {
+      console.log(xhr.response);
       cb(JSON.parse(xhr.responseText));
   });
 }
@@ -162,27 +162,24 @@ export function unlikeFeedItem(feedItemId, userId, cb) {
  * Adds a 'like' to a comment.
  */
 export function likeComment(feedItemId, commentIdx, userId, cb) {
-  var feedItem = readDocument('feedItems', feedItemId);
-  var comment = feedItem.comments[commentIdx];
-  comment.likeCounter.push(userId);
-  writeDocument('feedItems', feedItem);
-  comment.author = readDocument('users', comment.author);
-  emulateServerReturn(comment, cb);
+  sendXHR('PUT', '/feeditem/' + feedItemId + '/' + commentIdx 
+               + '/likelist/' + userId,
+          undefined, (xhr) => {
+            console.log(xhr.response);
+            cb(JSON.parse(xhr.responseText));
+          });
 }
 
 /**
  * Removes a 'like' from a comment.
  */
 export function unlikeComment(feedItemId, commentIdx, userId, cb) {
-  var feedItem = readDocument('feedItems', feedItemId);
-  var comment = feedItem.comments[commentIdx];
-  var userIndex = comment.likeCounter.indexOf(userId);
-  if (userIndex !== -1) {
-    comment.likeCounter.splice(userIndex, 1);
-    writeDocument('feedItems', feedItem);
-  }
-  comment.author = readDocument('users', comment.author);
-  emulateServerReturn(comment, cb);
+  sendXHR('PUT', '/feeditem/' + feedItemId + '/' + commentIdx 
+               + '/likelist/' + userId + '/unlike',
+          undefined, (xhr) => {
+            console.log(xhr.response);
+            cb(JSON.parse(xhr.responseText));
+          });
 }
 
 /**

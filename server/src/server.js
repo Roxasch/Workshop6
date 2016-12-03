@@ -6,6 +6,7 @@ var readDocument = database.readDocument;
 var writeDocument = database.writeDocument;
 var addDocument = database.addDocument;
 var StatusUpdateSchema = require('./schemas/statusupdate.json');
+var CommentSchema = require('./schemas/comment.json');
 
 // Imports the express Node module.
 var express = require('express');
@@ -93,6 +94,43 @@ app.get('/user/:userid/feed', function(req, res) {
     res.status(401).end();
   }
 });
+
+// I have no clue why when you post a comment it removes the names of the 
+// status or other comments...
+// Outputting the JSON that is returned it is the same as what is returned 
+// for the status update. It seems to be client side but my post comment there
+// is the same as the post status update so idk.
+function postComment(user, feedItemId, contents) {
+  var time = new Date().getTime();
+
+  var feedItem = readDocument('feedItems', feedItemId);
+
+  feedItem.comments.push({
+    "author": user,
+    "contents": contents,
+    "postDate": time,
+    "likeCounter": []
+  });
+
+  writeDocument('feedItems', feedItem);
+
+  return feedItem;
+}
+
+app.post('/comment', validate({ body: CommentSchema }), function(req, res) {
+  var body = req.body;
+  var fromUser = getUserIdFromToken(req.get('Authorization'));
+
+  if (fromUser === body.userId) {
+    var newUpdate = postComment(body.userId, body.feedItemId, body.contents);
+    res.status(201);
+    res.set('Location', '/comment/'+ newUpdate._id);
+    res.send(newUpdate);
+  } else {
+    res.status(401).end();
+  }
+})
+
 /**
 * Adds a new status update to the database.
 */
@@ -212,6 +250,46 @@ app.delete('/feeditem/:feeditemid', function(req, res) {
     res.status(401).end();
   }
 });
+
+app.put('/feeditem/:feeditemid/:commentid/likelist/:userid', function(req, res) {
+  var fromUser = getUserIdFromToken(req.get('Authorization'));
+  var feedItemId = parseInt(req.params.feeditemid, 10);
+  var commentId = parseInt(req.params.commentid, 10);
+  var userId = parseInt(req.params.userid, 10);
+
+  if (fromUser === userId) {
+    var feedItem = readDocument('feedItems', feedItemId);
+    if (feedItem.comments[commentId].likeCounter.indexOf(userId) === -1) {
+      feedItem.comments[commentId].likeCounter.push(parseInt(userId));
+      writeDocument('feedItems', feedItem);
+    }
+    res.send(feedItem.comments[commentId].likeCounter.map((userId) =>
+      readDocument('users', userId)));
+  } else {
+    res.status(401).end();
+  }
+})
+
+app.put('/feeditem/:feeditemid/:commentid/likelist/:userid/unlike', function(req, res) {
+  var fromUser = getUserIdFromToken(req.get('Authorization'));
+  var feedItemId = parseInt(req.params.feeditemid, 10);
+  var commentId = parseInt(req.params.commentid, 10);
+  var userId = parseInt(req.params.userid, 10);
+
+  if (fromUser === userId) {
+    var feedItem = readDocument('feedItems', feedItemId);
+    if (feedItem.comments[commentId].likeCounter.indexOf(userId) === -1) {
+      feedItem.comments[commentId].likeCounter.split(
+        feedItem.comments[commentId].likeCounter.indexOf(parseInt(userId)), 1);
+      writeDocument('feedItems', feedItem);
+    }
+    res.send(feedItem.comments[commentId].likeCounter.map((userId) =>
+      readDocument('users', userId)));
+  } else {
+    res.status(401).end();
+  }
+})
+
 // Like a feed item.
 app.put('/feeditem/:feeditemid/likelist/:userid', function(req, res) {
   var fromUser = getUserIdFromToken(req.get('Authorization'));
